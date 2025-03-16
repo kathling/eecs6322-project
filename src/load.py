@@ -51,13 +51,13 @@ def gamma_decoding_for_sRGB(gamma_img):
     # https://colour.readthedocs.io/en/latest/generated/colour.cctf_encoding.html
     # return colour.cctf_decoding(gamma_img, function='sRGB')
 
-def gamut_reduction(I_pp):
+def gamut_reduction(I_PP):
     # define M as described in the paper
-    print ('img', I_pp)
-    I_pp = I_pp / 255.0  # ASSUMPTION: must normalize to floating pt format before computations (because we tried it without normalization and almost all values were clipped because they ranged from 0-255)
-    # print(I_pp.dtype) # ASSUMPTION: working with float64, no values outside of [0,1] range
-    # print(I_pp.min(), I_pp.max())
-    # print('img normalized', I_pp) 
+    print ('img', I_PP)
+    I_PP = I_PP / 255.0  # ASSUMPTION: must normalize to floating pt format before computations (because we tried it without normalization and almost all values were clipped because they ranged from 0-255)
+    # print(I_PP.dtype) # ASSUMPTION: working with float64, no values outside of [0,1] range
+    # print(I_PP.min(), I_PP.max())
+    # print('img normalized', I_PP) 
 
     # from page 10 of paper
     M = np.array([[2.0365, -0.7376, -0.2993],
@@ -65,7 +65,7 @@ def gamut_reduction(I_pp):
                 [-0.0105, -0.1349, 1.1452]])
     
     # unclipped sRGB, M(I_PP), some resulting values fall outside the [0,1] range
-    unclipped_sRGB = np.dot(M, I_pp)
+    unclipped_sRGB = np.dot(M, I_PP)
     # transform unclipped sRGB such that in-gamut sRGB values are within range [0,1]
     print('unclipped_sRGB', unclipped_sRGB)
 
@@ -103,20 +103,22 @@ def gamut_reduction(I_pp):
 
     print("=====WORKS UNTIL HERE, done equation 2===============================")
     
-    return I_ClippedPP, OG_mask
+    return I_PP, I_ClippedPP, OG_mask
 
 # reshape the image to be 3 x N (where N is the number of pixels)
 # the original image is 512 x 512 x 3
 # img_prophoto_gamma.show()
-I_pp = img_prophoto_gamma.reshape(-1, 3).T # got this from gamut github code
+I_PP = img_prophoto_gamma.reshape(-1, 3).T # got this from gamut github code
 
-I_ClippedPP, OG_mask = gamut_reduction(I_pp)
+I_PP, I_ClippedPP, OG_mask = gamut_reduction(I_PP)
 OG_mask = (OG_mask).astype(np.float32) # convert to BW image, recall OG_mask is a boolean array
 
 # ASSUMPTION: cv2 can handle normalized FLOAT version of pixels without multiplying by 255
 # change shape for display
+I_PP = I_PP.T.reshape(512,512,3)
 I_ClippedPP = I_ClippedPP.T.reshape(512,512,3)
 OG_mask = OG_mask.T.reshape(512,512,3) # ASSUMPTION: we tried to "undo" line 112
+cv2.imshow('Displaying I_PP image using OpenCV', I_PP) 
 cv2.imshow('Displaying I_ClippedPP image using OpenCV', I_ClippedPP) 
 cv2.imshow('Displaying OG_mask image using OpenCV', OG_mask)
 
