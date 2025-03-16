@@ -10,14 +10,21 @@ Test Data: 200 images
 - split into 8 different zip files (I've just downloaded one of them for now)
 '''
 
-from PIL import Image
+import cv2
 import numpy as np
 import colour
+import matplotlib.pyplot as plt
 
 # let's take a look at the first image
-img = Image.open('datasets/train/standard_r9e70c57ft.png')
-# print(img.info.get('icc_profile'))
-# img.show()
+img_prophoto_gamma = cv2.imread('datasets/train/standard_r9e70c57ft.png')
+print('Datatype:', img_prophoto_gamma.dtype, '\nDimensions:', img_prophoto_gamma.shape) #unit8 datatype means values range from 0-255 = GAMMA
+
+# *IMP* check if linear or gamma encoding
+# is_linear = "Linear" if cv2.imread("datasets/train/standard_r9e70c57ft.png", cv2.IMREAD_ANYDEPTH).dtype == "float32" else "Gamma"
+# print(is_linear)
+
+# *IMP* display image
+cv2.imshow('ORIGINAL', img_prophoto_gamma) 
 
 # TODO: create a DataLoader 
 # TODO: retrieve the Clipped ProPhoto and Out-of-Gamut (OG) photos
@@ -30,63 +37,88 @@ img = Image.open('datasets/train/standard_r9e70c57ft.png')
 # - g: gamma encoding 
 
 
-def gamma_encoding(linear_img):
+def gamma_encoding_for_sRGB(linear_img):
     # https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22) 
-    # return np.where(linear_img <= 0.0031308, 12.92 * linear_img, 1.055 * np.power(linear_img, 1/2.4) - 0.055)
+    return np.where(linear_img <= 0.0031308, 12.92 * linear_img, 1.055 * np.power(linear_img, 1/2.4) - 0.055)
 
     # https://colour.readthedocs.io/en/latest/generated/colour.cctf_encoding.html
-    return colour.cctf_encoding(linear_img, function='sRGB')
+    # return colour.cctf_encoding(linear_img, function='sRGB')
 
-def gamut_reduction(img):
+def gamma_decoding_for_sRGB(gamma_img):
+    # https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22) 
+    return np.where(gamma_img <= 0.04045, gamma_img / 12.92, ((gamma_img + 0.055) / 1.055) ** 2.4)
+
+    # https://colour.readthedocs.io/en/latest/generated/colour.cctf_encoding.html
+    # return colour.cctf_decoding(gamma_img, function='sRGB')
+
+def gamut_reduction(I_pp):
     # define M as described in the paper
-    print ('img', img)
-    print(img.max())
-    print(img.dtype)
-    img = img / 255.0           # must normalize to floating pt format before computations
-    print('img normalized', img)
-    print("====================================")
+    print ('img', I_pp)
+    I_pp = I_pp / 255.0  # ASSUMPTION: must normalize to floating pt format before computations (because we tried it without normalization and almost all values were clipped because they ranged from 0-255)
+    # print(I_pp.dtype) # ASSUMPTION: working with float64, no values outside of [0,1] range
+    # print(I_pp.min(), I_pp.max())
+    # print('img normalized', I_pp) 
 
+    # from page 10 of paper
     M = np.array([[2.0365, -0.7376, -0.2993],
                 [-0.2257, 1.2232, 0.0027],
                 [-0.0105, -0.1349, 1.1452]])
     
-    # unclipped sRGB, M(I_PP)
-    unclipped_sRGB = np.dot(M, img)
-    # # transform unclipped sRGB such that in-gamut sRGB values are within range [0,1]
-    # unclipped_sRGB = unclipped_sRGB/ 255.0
+    # unclipped sRGB, M(I_PP), some resulting values fall outside the [0,1] range
+    unclipped_sRGB = np.dot(M, I_pp)
+    # transform unclipped sRGB such that in-gamut sRGB values are within range [0,1]
     print('unclipped_sRGB', unclipped_sRGB)
 
-
+    # locate out-of-gamut (OG) sRGB values, row-wise
+    R_mask = (unclipped_sRGB[0] < 0) | (unclipped_sRGB[0] > 1)
+    G_mask = (unclipped_sRGB[1] < 0) | (unclipped_sRGB[1] > 1)
+    B_mask = (unclipped_sRGB[2] < 0) | (unclipped_sRGB[2] > 1)
+    
+    # ASSUMPTION: a pixel is considered OG if any one of its colour values is out of [0,1] range
+    # we assume this is the correct assumption because Figures 2 and 3 show "clipped values" as (R', G', B') --> signifies all 3 color values of a pixel are clipped
+    OG_mask = np.logical_or(R_mask, G_mask, B_mask)
+    print(OG_mask.shape)
+    OG_mask = np.stack((OG_mask, OG_mask, OG_mask))
+    print(OG_mask.shape)
+    print(OG_mask)
     print("====================================")
 
-    # clip
+    # clip, no values outside of [0,1] range
     clipped_sRGB = np.clip(unclipped_sRGB, 0, 1)
     print('clipped_sRGB', clipped_sRGB)
     print("====================================")
 
-    # # obtain the out of gamut (OG) pixels
-    # OG = np.where((unclipped_sRGB < 0) | (unclipped_sRGB > 1))
-
     # gamma encoding
-    nonlinear_srgb = gamma_encoding(unclipped_sRGB)
+    I_sRGB = gamma_encoding_for_sRGB(clipped_sRGB)
     # nonlinear_srgb = gamma_encoding(clipped_sRGB)
-    print('nonlinear_srgb', nonlinear_srgb)
-    print("====================================")
+    print('I_sRGB', I_sRGB)
+    print("=====WORKS UNTIL HERE, done equation 1===============================")
 
-    return nonlinear_srgb
+    # Equation (2)
+    M_inverse = np.linalg.inv(M)
+    de_gamma_I_sRGB = gamma_decoding_for_sRGB(I_sRGB)
+
+    I_ClippedPP = np.dot(M_inverse, de_gamma_I_sRGB)
+    print(I_ClippedPP.min(), I_ClippedPP.max())
+
+    print("=====WORKS UNTIL HERE, done equation 2===============================")
+    
+    return I_ClippedPP, OG_mask
 
 # reshape the image to be 3 x N (where N is the number of pixels)
 # the original image is 512 x 512 x 3
-img.show()
-temp = np.reshape(img, (3, 512*512))
+# img_prophoto_gamma.show()
+I_pp = img_prophoto_gamma.reshape(-1, 3).T # got this from gamut github code
 
-res = gamut_reduction(temp)
+I_ClippedPP, OG_mask = gamut_reduction(I_pp)
+OG_mask = (OG_mask).astype(np.float32) # convert to BW image, recall OG_mask is a boolean array
 
-# print('OG shape', OG.shape)
-# OG_image = OG.reshape(3, 512, 512).transpose(1, 2, 0)
-image = res.reshape(3, 512, 512).transpose(1, 2, 0)
-image = (image * 255).astype(np.uint8)
-print(image)
-print(image.shape)
-Image.fromarray(image).show()
-# Image.fromarray(OG_image).show()
+# ASSUMPTION: cv2 can handle normalized FLOAT version of pixels without multiplying by 255
+# change shape for display
+I_ClippedPP = I_ClippedPP.T.reshape(512,512,3)
+OG_mask = OG_mask.T.reshape(512,512,3) # ASSUMPTION: we tried to "undo" line 112
+cv2.imshow('Displaying I_ClippedPP image using OpenCV', I_ClippedPP) 
+cv2.imshow('Displaying OG_mask image using OpenCV', OG_mask)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
