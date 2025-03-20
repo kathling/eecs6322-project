@@ -15,6 +15,8 @@ import numpy as np
 import colour
 import matplotlib.pyplot as plt
 
+import utils
+
 # let's take a look at the first image
 img_prophoto_gamma = cv2.imread('datasets/train/standard_r9e70c57ft.png')
 print('Datatype:', img_prophoto_gamma.dtype, '\nDimensions:', img_prophoto_gamma.shape) #unit8 datatype means values range from 0-255 = GAMMA
@@ -70,12 +72,14 @@ def gamut_reduction(I_PP):
     print('unclipped_sRGB', unclipped_sRGB)
 
     # locate out-of-gamut (OG) sRGB values, row-wise
+    # True = OG, False = in-gamut (IG)
     R_mask = (unclipped_sRGB[0] < 0) | (unclipped_sRGB[0] > 1)
     G_mask = (unclipped_sRGB[1] < 0) | (unclipped_sRGB[1] > 1)
     B_mask = (unclipped_sRGB[2] < 0) | (unclipped_sRGB[2] > 1)
     
     # ASSUMPTION: a pixel is considered OG if any one of its colour values is out of [0,1] range
     # we assume this is the correct assumption because Figures 2 and 3 show "clipped values" as (R', G', B') --> signifies all 3 color values of a pixel are clipped
+    # True = Pixel is OG, False = Pixel is in-gamut (IG)
     OG_mask = np.logical_or(R_mask, G_mask, B_mask)
     print(OG_mask.shape)
     OG_mask = np.stack((OG_mask, OG_mask, OG_mask))
@@ -111,16 +115,19 @@ def gamut_reduction(I_PP):
 I_PP = img_prophoto_gamma.reshape(-1, 3).T # got this from gamut github code
 
 I_PP, I_ClippedPP, OG_mask = gamut_reduction(I_PP)
-OG_mask = (OG_mask).astype(np.float32) # convert to BW image, recall OG_mask is a boolean array
+display_OG_mask = (OG_mask).astype(np.float32) # convert to BW image, recall OG_mask is a boolean array
 
 # ASSUMPTION: cv2 can handle normalized FLOAT version of pixels without multiplying by 255
 # change shape for display
-I_PP = I_PP.T.reshape(512,512,3)
-I_ClippedPP = I_ClippedPP.T.reshape(512,512,3)
-OG_mask = OG_mask.T.reshape(512,512,3) # ASSUMPTION: we tried to "undo" line 112
-cv2.imshow('Displaying I_PP image using OpenCV', I_PP) 
-cv2.imshow('Displaying I_ClippedPP image using OpenCV', I_ClippedPP) 
-cv2.imshow('Displaying OG_mask image using OpenCV', OG_mask)
+display_I_PP = I_PP.T.reshape(512,512,3) # ASSUMPTION: we tried to "undo" line 112
+display_I_ClippedPP = I_ClippedPP.T.reshape(512,512,3)
+display_OG_mask = display_OG_mask.T.reshape(512,512,3) # A white pixel represents OG pixel (value = 1/True), black represents IG (value = 0/False)
+cv2.imshow('Displaying I_PP image using OpenCV', display_I_PP) 
+cv2.imshow('Displaying I_ClippedPP image using OpenCV', display_I_ClippedPP) 
+cv2.imshow('Displaying OG_mask image using OpenCV', display_OG_mask)
 
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()
+
+# SECTION 3.2: GamutMLP model and optimization
+utils.generatingTrainingInputAndGroundTruth(display_I_PP, display_I_ClippedPP, display_OG_mask)

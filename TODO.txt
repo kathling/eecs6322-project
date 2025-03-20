@@ -1,0 +1,6 @@
+1. finish train.py to finish training model on sampled data
+2. gamut-expansion
+3. experiments
+deadline for all code... let's do Mar 30
+
+4. report/presentation
