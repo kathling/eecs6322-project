@@ -1,9 +1,16 @@
-# import torch
-# from torchvision import datasets, transforms
-# import matplotlib
-# matplotlib.use('agg')
-# from matplotlib import pyplot as plt
-# import numpy as np
+import torch
+from torchvision import datasets, transforms
+import matplotlib
+matplotlib.use('agg')
+
+from matplotlib import pyplot as plt
+import numpy as np
+import cv2
+
+from model import GamutMLP
+import utils
+import load
+
 
 # # ==================================================================
 # # Copy your compute accuracy function from Part1 here
@@ -22,53 +29,139 @@
 #     acc = numCorrect/np.size(prediction, 0)
 #     return acc
 
-# # ==================================================================
-# # Build components
-# # ==================================================================
-# # Magic variables
-# batch_size = 100
+# load in one image
+img_prophoto_gamma = cv2.imread('datasets/train/standard_r9e70c57ft.png')
+# cv2.imshow('ORIGINAL', img_prophoto_gamma) 
+I_PP = img_prophoto_gamma.reshape(-1, 3).T # got this from gamut github code
+I_PP, I_ClippedPP, OG_mask = load.gamut_reduction(I_PP)
+display_OG_mask = (OG_mask).astype(np.float32) # convert to BW image, recall OG_mask is a boolean array
+display_I_PP = I_PP.T.reshape(512,512,3) # ASSUMPTION: we tried to "undo" line 112
+display_I_ClippedPP = I_ClippedPP.T.reshape(512,512,3)
+display_OG_mask = display_OG_mask.T.reshape(512,512,3) # A white pixel represents OG pixel (value = 1/True), black represents IG (value = 0/False)
 
-# # this transformation is applied at to the output of datasets
-# # dataset provided images in PIL format, this transform also goes from [0,255] to [0,1]
-# transform=transforms.ToTensor()
+print('I_PP_Clipped', I_ClippedPP)
+print('shape of I_PP_Clipped', I_ClippedPP.shape)
 
-# # training and validation datasets
-# dataset_train = datasets.MNIST('data', train=True, download=True,transform=transform)
-# dataset_val = datasets.MNIST('data', train=False, download=True,transform=transform)
+# training_input: the 120D-feature vector mapped(x, y, R', G', B') values
+# ground_truth: the original PP values (x, y, R, G, B)
+# I_ClippedPP_5d_coords: the clipped PP values (x, y, R', G', B')
+training_input, ground_truth, I_ClippedPP_5d_coords = utils.generatingTrainingInputAndGroundTruth(display_I_PP, display_I_ClippedPP, display_OG_mask)
 
-# # dataloaders for datasets
-# # These will handling batching, shuffling of your data
-# # num_workers > 0 allows the code to prefetch data concurrently while training is occuring, increases training speed
-# dataloader_train = torch.utils.data.DataLoader(dataset_train,batch_size=batch_size,shuffle=True,num_workers=4)
-# dataloader_val = torch.utils.data.DataLoader(dataset_val,batch_size=batch_size,shuffle=True,num_workers=4)
+# print("="*50)
+# print(training_input)
+# print('>>> shape:', training_input.shape)
+# print("="*50)
+# print(ground_truth)
+# print('>>> shape:', ground_truth.shape)
+# print("="*50)
+# print(I_ClippedPP_5d_coords)
+# print('>>> shape:', I_ClippedPP_5d_coords.shape)
+# build network
+net = GamutMLP()
 
-# # build network
-# net = Net()
+# L2 (MSE) Loss Function described in Eq. 5
+# https://pytorch.org/docs/stable/generated/torch.nn.MSELoss.html
+loss_fn =  torch.nn.MSELoss()
 
-# # build loss function, use a CrossEntropyLoss
-# # take a look at: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
-# # ?????
-# loss_fn =  torch.nn.CrossEntropyLoss()
+# build optimizer, and set learning rate
+# https://pytorch.org/docs/stable/generated/torch.optim.Adam.html
+learning_rate = 0.001
+optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
-# # build optimizer, and set learning rate
-# # unlike Part1 we will have an optimizer object manage parameter updates
-# # take a look at: https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
-# learning_rate = 0.05
-# # ?????
-# optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate)
-
-# if __name__ == '__main__':
-#     # ==================================================================
-#     # Train loop
-#     # ==================================================================
-#     global_it = 0 # keep track of total number of iterations elapsed
+if __name__ == '__main__':
+    # ==================================================================
+    # Train loop
+    # ==================================================================
 #     train_losses = [] # this stuff here is to track training statistics
 #     train_accuracies = []
 #     val_iterations = []
 #     val_losses = []
 #     val_accuracies = []
-#     for epoch in range(4): # an epoch is # of iterations to go through the whole training set
-#         net.train() # good practice, some networks have training dependent behaviour
+    
+    for iter in range(9000): # num of optimization iterations
+        net.train() # good practice, some networks have training dependent behaviour
+        optimizer.zero_grad()
+        x = torch.tensor(training_input).float()
+        pred_residuals = net(x)
+        
+        # Equation 3, the recovered/predicted wide-gamut PP image
+        # convert to torch tensor
+        sampled_pixels_restored_values = torch.tensor(I_ClippedPP_5d_coords[:, -3:]).float() + pred_residuals
+        # print('sampled_pixels_restored_values', sampled_pixels_restored_values)
+        # print('sampled_pixels_restored_values shape', sampled_pixels_restored_values.shape)
+
+        '''
+        # saved to restore the img
+        I_PP_hat = torch.clone(torch.tensor(display_I_ClippedPP))
+        for i in range(I_ClippedPP_5d_coords.shape[0]):
+            row = I_ClippedPP_5d_coords[i]
+            x = row[0].astype(int)
+            y = row[1].astype(int)
+            
+            # populate the predicted img with restored RGB values
+            I_PP_hat[x, y, 0] = sampled_pixels_restored_values[i, 0]
+            I_PP_hat[x, y, 1] = sampled_pixels_restored_values[i, 1]
+            I_PP_hat[x, y, 2] = sampled_pixels_restored_values[i, 2]
+        np_I_PP_hat = I_PP_hat.detach().cpu().numpy()
+        '''
+        # print('type np_I_PP_hat', type(np_I_PP_hat))
+        # cv2.imshow('Displaying I_ClippedPP image using OpenCV', np_I_PP_hat) 
+        # cv2.waitKey(0)
+
+        # Equation 5, use L2 loss
+        # convert to torch tensor
+        # ground_truth = torch.tensor(ground_truth).float()
+        # print('I_PP_hat', I_PP_hat)
+        # print('I_PP_hat shape', I_PP_hat.shape)
+        # print('ground_truth', ground_truth)
+        # print('ground_truth shape', ground_truth.shape)
+        ground_truth_RGB = torch.tensor(ground_truth[:, -3:]).float()
+        loss = loss_fn(sampled_pixels_restored_values, ground_truth_RGB)
+
+        loss.backward()
+        optimizer.step()
+
+        # print out stats every 10 its
+        if iter % 10 == 0:
+            print(f'Iteration: {iter} | Loss: {loss.item()}')
+        #     # print(f'Iteration: {iter} | Loss: {loss.item()} | Accuracy: {accuracy}')
+
+        # for i in range(training_input.shape[0]):
+        #     # get the training input for the i'th pixel sampled
+        #     x = training_input[i]
+        #     x = torch.tensor(x).float()
+            
+        #     pred = net(x)
+        #     print('pred residuals', pred)
+        #     break
+
+    print('Training complete')
+    # Now, let's see how well GamutMLP restores the clipped PP image
+    encoded_5d_coords, I_Clipped_PP_5d_coords = utils.gamut_expansion(display_I_ClippedPP)
+    with torch.no_grad():
+        net.eval()
+        x = torch.tensor(encoded_5d_coords).float()
+        pred_residuals = net(x)
+
+    # Equation 3, the recovered/predicted wide-gamut PP image
+    # convert to torch tensor
+    all_pixels_restored_values = torch.tensor(I_Clipped_PP_5d_coords[:, -3:]).float() + pred_residuals
+
+    # Restore the image
+    restored_I_PP = torch.zeros((512, 512, 3))
+    for x in range(512):
+        for y in range(512):
+            idx = x * 512 + y
+            restored_I_PP[x, y, 0] = all_pixels_restored_values[idx, 0]
+            restored_I_PP[x, y, 1] = all_pixels_restored_values[idx, 1]
+            restored_I_PP[x, y, 2] = all_pixels_restored_values[idx, 2]
+    
+    restored_I_PP = restored_I_PP.detach().cpu().numpy()
+    cv2.imshow('Displaying Original I_PP image', display_I_PP)
+    cv2.imshow('Displaying Clipped I_PP image', display_I_ClippedPP)
+    cv2.imshow('Displaying Restored I_ClippedPP image', restored_I_PP) 
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 #         for im, label in dataloader_train: # the dataloader is an iterator, will shuffle, then go through all data once,
 #             # Center data and pad to 32x32, for convienence
 #             im = im - 0.5

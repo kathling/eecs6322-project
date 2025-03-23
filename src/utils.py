@@ -1,8 +1,8 @@
 import numpy as np
 
 def generatingTrainingInputAndGroundTruth(I_PP, I_ClippedPP, OG_mask):
-
     # Step 1: Sampling (also generates ground truth for those samples)
+    # ground_truth: original PP values 5D coordinates (x, y, R, G, B)
     all_5d_coords, ground_truth = sampling(I_PP, I_ClippedPP, OG_mask)
     I_ClippedPP_5d_coords = all_5d_coords # note we need this for equation 3
 
@@ -13,6 +13,9 @@ def generatingTrainingInputAndGroundTruth(I_PP, I_ClippedPP, OG_mask):
     final_training_input = encode(normalized_all_5d_coords)
 
     return final_training_input, ground_truth, I_ClippedPP_5d_coords
+
+
+# def generate_5D_coords():
 
 
 def sampling(I_PP, I_ClippedPP, OG_mask):
@@ -118,3 +121,37 @@ def encodingFunctionGamma(z):
         result.append((np.cos(2**i * np.pi * z)))
         
     return np.array(result)
+
+
+# Gamut Expansion Step, (just getting the 120D feature vectors for all pixels)
+# Method 2: Use display_I_PP, display_I_ClippedPP, display_OG_mask which are in display form with shape (512,512,3)
+# Assumption: using Method 2 (defined in utils.py sampling() method) due to ease in finding spatial coordinates
+def gamut_expansion(I_ClippedPP):
+    # ASSUMPTION: "all pixels" refers to all pixels in the image (not just out-of-gamut)
+    # From page 3, gamut expansion section:
+    # "The extracted model predicts the residuals of all pixels and adds them 
+    # to the IClippedPP to recover the color values as shown in Figure 3." 
+    # normalize and encode all pixels
+    all_5d_coords = [] # list of lists
+    for x in range(512):
+        for y in range(512):
+            R_prime = I_ClippedPP[x, y, 0]
+            G_prime = I_ClippedPP[x, y, 1]
+            B_prime = I_ClippedPP[x, y, 2]
+            FiveD_coords = [x, y, R_prime, G_prime, B_prime]
+            all_5d_coords.append(FiveD_coords)
+    # convert to array for easier normalization
+
+    # this is original I_ClippedPP 5D coordinates
+    all_5d_coords = np.array(all_5d_coords)
+
+    # normalize
+    normalized_all_5d_coords = normalize(all_5d_coords)
+
+    # encode
+    encoded_all_5d_coords = encode(normalized_all_5d_coords)
+
+    print('encoded: ', encoded_all_5d_coords)
+    print('shape: ', encoded_all_5d_coords.shape)
+
+    return encoded_all_5d_coords, all_5d_coords

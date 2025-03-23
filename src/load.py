@@ -26,7 +26,7 @@ print('Datatype:', img_prophoto_gamma.dtype, '\nDimensions:', img_prophoto_gamma
 # print(is_linear)
 
 # *IMP* display image
-cv2.imshow('ORIGINAL', img_prophoto_gamma) 
+# cv2.imshow('ORIGINAL', img_prophoto_gamma) 
 
 # TODO: create a DataLoader 
 # TODO: retrieve the Clipped ProPhoto and Out-of-Gamut (OG) photos
@@ -122,9 +122,9 @@ display_OG_mask = (OG_mask).astype(np.float32) # convert to BW image, recall OG_
 display_I_PP = I_PP.T.reshape(512,512,3) # ASSUMPTION: we tried to "undo" line 112
 display_I_ClippedPP = I_ClippedPP.T.reshape(512,512,3)
 display_OG_mask = display_OG_mask.T.reshape(512,512,3) # A white pixel represents OG pixel (value = 1/True), black represents IG (value = 0/False)
-cv2.imshow('Displaying I_PP image using OpenCV', display_I_PP) 
-cv2.imshow('Displaying I_ClippedPP image using OpenCV', display_I_ClippedPP) 
-cv2.imshow('Displaying OG_mask image using OpenCV', display_OG_mask)
+# cv2.imshow('Displaying I_PP image using OpenCV', display_I_PP) 
+# cv2.imshow('Displaying I_ClippedPP image using OpenCV', display_I_ClippedPP) 
+# cv2.imshow('Displaying OG_mask image using OpenCV', display_OG_mask)
 
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
