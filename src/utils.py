@@ -132,6 +132,7 @@ def gamut_expansion(I_ClippedPP):
     # "The extracted model predicts the residuals of all pixels and adds them 
     # to the IClippedPP to recover the color values as shown in Figure 3." 
     # normalize and encode all pixels
+    # test line for windows computer
     all_5d_coords = [] # list of lists
     for x in range(512):
         for y in range(512):
