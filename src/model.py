@@ -19,6 +19,8 @@ class GamutMLP(nn.Module):
         ---
         The 5D coordinate and color input (x,y,R ,G ,B )is encoded as a 120D-feature 
         vector before passing it to the MLP.
+
+        This model's corresponding model size is 23KB (as specified in the paper).
         '''
         # self.model = nn.Sequential(
         #     nn.Linear(120, 32),

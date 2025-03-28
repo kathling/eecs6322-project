@@ -2,6 +2,8 @@ DONE 1. finish train.py to finish training model on sampled data
 DONE 2. gamut-expansion
 
 3. experiments
+- finish Table 1
+- finish Figure 8
 deadline for all code... let's do Mar 30
 
 4. report/presentation

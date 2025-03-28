@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import utils
 
 # let's take a look at the first image
-img_prophoto_gamma = cv2.imread('datasets/train/standard_r9e70c57ft.png')
+img_prophoto_gamma = cv2.imread('datasets/train/vivid_SamsungNX2000_0160.png')
 print('Datatype:', img_prophoto_gamma.dtype, '\nDimensions:', img_prophoto_gamma.shape) #unit8 datatype means values range from 0-255 = GAMMA
 
 # *IMP* check if linear or gamma encoding

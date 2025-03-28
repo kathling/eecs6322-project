@@ -17,16 +17,15 @@ import load
 # # I want you to use that because it uses Numpy, we will learn to convert torch->numpy tensors
 # # IMPORTANT: Numpy only, I DON'T WANT TO SEE PYTORCH HERE
 # # ==================================================================
-# def compute_accuracy(prediction,gt_logits):
-#     # acc = ?????
-#     pred_labels = np.argmax(prediction, axis=1)
+# def compute_accuracy(prediction_img,gt_img):
+#     # pred_labels = np.argmax(prediction_img, axis=1)
     
-#     # slight change from Part1-skeleton; didn't need to squeeze gt_logits because already same dimensions as pred_labels
-#     compare_result = np.equal(pred_labels, gt_logits)
+#     # slight change from Part1-skeleton; didn't need to squeeze gt_img because already same dimensions as pred_labels
+#     compare_result = np.equal(pred_labels, gt_img)
     
 #     numCorrect = compare_result.sum()
     
-#     acc = numCorrect/np.size(prediction, 0)
+#     acc = numCorrect/np.size(prediction_img, 0)
 #     return acc
 
 # load in one image
