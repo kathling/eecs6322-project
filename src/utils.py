@@ -15,9 +15,6 @@ def generatingTrainingInputAndGroundTruth(I_PP, I_ClippedPP, OG_mask):
     return final_training_input, ground_truth, I_ClippedPP_5d_coords
 
 
-# def generate_5D_coords():
-
-
 def sampling(I_PP, I_ClippedPP, OG_mask):
     # select 2% of IG pixels and 20% of OG pixels uniformly over spatial coordinates
 
@@ -134,8 +131,10 @@ def gamut_expansion(I_ClippedPP):
     # normalize and encode all pixels
     # test line for windows computer
     all_5d_coords = [] # list of lists
-    for x in range(512):
-        for y in range(512):
+    # get height and width
+    height, width = I_ClippedPP.shape[0], I_ClippedPP.shape[1]
+    for x in range(height):
+        for y in range(width):
             R_prime = I_ClippedPP[x, y, 0]
             G_prime = I_ClippedPP[x, y, 1]
             B_prime = I_ClippedPP[x, y, 2]

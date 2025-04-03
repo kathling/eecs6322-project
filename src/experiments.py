@@ -65,7 +65,7 @@ if __name__ == '__main__':
     psnr_loss = []
     psnr_og_loss = []
     optim_time = []
-    
+    full_start_time = time.time()
     start_time = time.time() # optimization start time
     for iter in range(9000): # num of optimization iterations
         net.train() # good practice, some networks have training dependent behaviour
@@ -90,7 +90,8 @@ if __name__ == '__main__':
             print(f'Iteration: {iter} | Loss: {loss.item()}')
     end_time = time.time() # optimization start time
 
-    print('optimization time: ', end_time - start_time)
+    optim_time = end_time - start_time
+    print('optimization time: ', optim_time)
 
     # Now, let's see how well GamutMLP restores the clipped PP image
     encoded_5d_coords, I_Clipped_PP_5d_coords = utils.gamut_expansion(display_I_ClippedPP)
@@ -102,23 +103,27 @@ if __name__ == '__main__':
     # Equation 3, the recovered/predicted wide-gamut PP image
     # convert to torch tensor
     all_pixels_restored_values = torch.tensor(I_Clipped_PP_5d_coords[:, -3:]).float() + pred_residuals
+    print('ALL PIXELS SHAPE: ', all_pixels_restored_values.shape)
 
     # Restore the image
-    restored_I_PP = torch.zeros((512, 512, 3))
-    for x in range(512):
-        for y in range(512):
-            idx = x * 512 + y
-            restored_I_PP[x, y, 0] = all_pixels_restored_values[idx, 0]
-            restored_I_PP[x, y, 1] = all_pixels_restored_values[idx, 1]
-            restored_I_PP[x, y, 2] = all_pixels_restored_values[idx, 2]
+    restored_I_PP = all_pixels_restored_values.view(512, 512, 3)
+    # restored_I_PP = torch.zeros((512, 512, 3))
+    # for x in range(512):
+    #     for y in range(512):
+    #         idx = x * 512 + y
+    #         restored_I_PP[x, y, 0] = all_pixels_restored_values[idx, 0]
+    #         restored_I_PP[x, y, 1] = all_pixels_restored_values[idx, 1]
+    #         restored_I_PP[x, y, 2] = all_pixels_restored_values[idx, 2]
+    # print("ARE THEY THE SAME? ", torch.equal(restored_I_PP, restored_I_PP_new))
     
     restored_I_PP = restored_I_PP.detach().cpu().numpy()
+    print('RESTORED PP shape: ', restored_I_PP.shape)
 
     # calculate the metrics
-    print('I_PP shape: ', I_PP.shape)
-    print('OG mask shape: ', display_OG_mask.shape)
-    print('Display I_PP shape:', display_I_PP.shape)
-    print('Restored I_PP shape: ', restored_I_PP.shape)
+    # print('I_PP shape: ', I_PP.shape)
+    # print('OG mask shape: ', display_OG_mask.shape)
+    # print('Display I_PP shape:', display_I_PP.shape)
+    # print('Restored I_PP shape: ', restored_I_PP.shape)
     
     # calculate metrics for OG
     # convert OG (np array to tensor)
@@ -148,6 +153,21 @@ if __name__ == '__main__':
 
     # cv2.imshow('Displaying Original I_PP image', display_I_PP)
     # cv2.imshow('Displaying Clipped I_PP image', display_I_ClippedPP)
+    cv2.namedWindow("Test")
+    cv2.moveWindow("Test", 40, 30)
+    cv2.imshow("Test", restored_I_PP) 
     # cv2.imshow('Displaying Restored I_ClippedPP image', restored_I_PP) 
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    full_end_time = time.time()
+    print("FULL TIME TO RUN 1 IMG: ", full_end_time - full_start_time)
+
+    with open('results-sample.txt', 'w') as f:
+        f.write(f'>>> RMSE: {rmse}\n')
+        f.write(f'>>> RMSE OG: {rmse_og}\n')
+        f.write(f'>>> PSNR: {psnr}\n')
+        f.write(f'>>> PSNR OG: {psnr_og}\n')
+        f.write(f'>>> OPTIM TIME: {optim_time}\n')
+        f.write('===============================================\n')
+    f.close()
