@@ -4,6 +4,8 @@ This is done for GamutMLP (23KB) and GamutMLP_53KB (53KB) to reproduce Table 1.
 Pretrained weights are saved in the 'weights' folder.
 
 Run this file to get the pretrained weights.
+
+It takes around 4 hours to pretrain the model.
 '''
 
 import torch
@@ -12,7 +14,6 @@ import cv2
 import time
 from evaluate import restore_img
 from model import GamutMLP, GamutMLP_64HF_53KB
-import load
 import utils
 from train import train
 
@@ -32,7 +33,7 @@ def preprocess_images(image_paths):
 
         I_PP = img_prophoto_gamma.reshape(-1, 3).T
         I_PP = torch.tensor(I_PP, device=device)        # move to GPU 
-        I_PP, I_ClippedPP, OG_mask = load.gamut_reduction(I_PP, device)
+        I_PP, I_ClippedPP, OG_mask = utils.gamut_reduction(I_PP, device)
 
         preprocessed_imgs.append((I_PP.cpu(), I_ClippedPP.cpu(), OG_mask.cpu(), height, width))
     
@@ -63,7 +64,7 @@ def pretrain(model_name, image_paths, checkpoint_path, META_EPOCH=2):
     else:
         raise ValueError("Invalid pre-train GamutMLP model name. Choose from [GamutMLP, GamutMLP_53KB]")
     
-    # meta-GamutMLP pre-training hyperparameters specified in the paper 
+    # meta-GamutMLP pre-training hyperparameters specified in the paper (see Page 4, Section 3.2)
     loss_fn =  torch.nn.MSELoss()
     learning_rate = 0.01                                            
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
@@ -75,8 +76,15 @@ def pretrain(model_name, image_paths, checkpoint_path, META_EPOCH=2):
     preprocessed_imgs = torch.load('datasets/processed/preprocessed_imgs.pth',
                                     map_location='cpu')
     
+    # Save the model weights
+    curr_path = os.getcwd()
+    folder_name = 'pretrained_weights'
+    if not os.path.exists(f'{curr_path}/{folder_name}'):
+        os.makedirs(folder_name)
+
     print('Starting pretraining...')
     # Pretrain the model
+    model.train()  # set model to training mode
     start_time = time.time()    # pretraining start time
     for epoch in range(META_EPOCH):
         counter = 0
@@ -98,18 +106,16 @@ def pretrain(model_name, image_paths, checkpoint_path, META_EPOCH=2):
             train(model, training_input, I_ClippedPP_5d_coords, ground_truth, optimizer, loss_fn, iterations, device)
 
             counter += 1
-            if counter % 10 == 0:
+            # save checkpoint every 100 images
+            if counter % 100 == 0:
                 print(f'Epoch: {epoch}, Image: {counter}/{len(image_paths)}')
+                torch.save(model.state_dict(), checkpoint_path)
 
     end_time = time.time()      # pretraining end time
     total_train_time = end_time - start_time
     print(f'Pretraining time: {total_train_time} seconds')
 
-    # Save the model weights
-    torch.save(model.state_dict(), checkpoint_path)
-
     # Save time it took to pretrain model into a log file
-    curr_path = os.getcwd()
     folder_name = 'logs'
     if not os.path.exists(f'{curr_path}/{folder_name}'):
         os.makedirs(folder_name)
@@ -129,7 +135,7 @@ if __name__ == '__main__':
     # This is what you need to modify to change the model type
     model_name = 'GamutMLP'
     checkpoint_path = 'pretrained_weights/metamlp_23KB.pth'
-    META_EPOCH=2
+    META_EPOCH=1
 
     pretrain(model_name, image_paths, checkpoint_path, META_EPOCH)
     print('Pretraining completed.')
