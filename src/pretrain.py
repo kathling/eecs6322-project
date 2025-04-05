@@ -99,14 +99,11 @@ def pretrain(model_name, image_paths, checkpoint_path, META_EPOCH=2):
             display_OG_mask = OG_mask.float().T.reshape(height,width,3)
 
             # check if these are also on GPU
-            # print(f'display_I_PP device: {display_I_PP.device}')
-            # print(f'display_I_ClippedPP device: {display_I_ClippedPP.device}')
-            # print(f'display_OG_mask device: {display_OG_mask.device}')
             training_input, ground_truth, I_ClippedPP_5d_coords = utils.generate_normalized_training_data(display_I_PP, display_I_ClippedPP, display_OG_mask)
             train(model, training_input, I_ClippedPP_5d_coords, ground_truth, optimizer, loss_fn, iterations, device)
 
             counter += 1
-            # save checkpoint every 100 images
+            # Save checkpoint every 100 images
             if counter % 100 == 0:
                 print(f'Epoch: {epoch}, Image: {counter}/{len(image_paths)}')
                 torch.save(model.state_dict(), checkpoint_path)
@@ -115,12 +112,15 @@ def pretrain(model_name, image_paths, checkpoint_path, META_EPOCH=2):
     total_train_time = end_time - start_time
     print(f'Pretraining time: {total_train_time} seconds')
 
+    # Save the final model weights
+    torch.save(model.state_dict(), checkpoint_path)
+
     # Save time it took to pretrain model into a log file
     folder_name = 'logs'
     if not os.path.exists(f'{curr_path}/{folder_name}'):
         os.makedirs(folder_name)
-    with open(f'{folder_name}/meta-mlp-pretrain-23KB.txt', 'w') as f:
-        f.write(f'Total training time to pre-train GamutMLP (23KB): {total_train_time}\n')
+    with open(f'{folder_name}/meta-mlp-pretrain-53KB.txt', 'w') as f:
+        f.write(f'Total training time to pre-train GamutMLP (53KB): {total_train_time}\n')
     f.close()
 
 if __name__ == '__main__':
@@ -133,8 +133,11 @@ if __name__ == '__main__':
     image_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
 
     # This is what you need to modify to change the model type
-    model_name = 'GamutMLP'
-    checkpoint_path = 'pretrained_weights/metamlp_23KB.pth'
+    # model_name = 'GamutMLP'
+    model_name = 'GamutMLP_53KB'
+    print(f'Pretraining {model_name} model...')
+    # checkpoint_path = 'pretrained_weights/metamlp_23KB.pth'
+    checkpoint_path = 'pretrained_weights/metamlp_53KB.pth'
     META_EPOCH=1
 
     pretrain(model_name, image_paths, checkpoint_path, META_EPOCH)
