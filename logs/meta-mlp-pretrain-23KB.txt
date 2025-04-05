@@ -1,0 +1,1 @@
+Total training time to pre-train GamutMLP (23KB): 13333.568759679794
