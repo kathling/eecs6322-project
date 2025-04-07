@@ -16,7 +16,7 @@ def restore_img(GamutMLP, encoded_pixels, I_Clipped_PP_5d_coords,
         width: width of the image
         device: 'cuda' (GPU), 'cpu' (CPU)
     '''
-    GamutMLP.eval()
+    GamutMLP.eval()         # set to eval mode to get final results
     with torch.no_grad():
         pred_residuals = GamutMLP(encoded_pixels)
     

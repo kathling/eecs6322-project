@@ -1,1 +1,0 @@
-total training time to pre-train GamutMLP (53KB) on 100 images: 7543.411130428314

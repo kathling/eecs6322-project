@@ -34,7 +34,10 @@ def report_metrics(rmse_loss, rmse_og_loss, psnr_loss, psnr_og_loss, optim_times
     if not os.path.exists(f'{curr_path}/{folder_name}'):
         os.makedirs(folder_name)
     with open(os.path.join(folder_name, logs_filename), 'w') as f:
-        f.write(f'MODEL: {config["model"]}\n\n')
+        if config['pretrained']:
+            f.write(f'MODEL: meta-{config["model"]}\n\n')
+        else:
+            f.write(f'MODEL: {config["model"]}\n\n')
         f.write('===============================================\n')
         f.write(f'AVERAGE RESULTS\n')
         f.write('===============================================\n')
@@ -92,8 +95,6 @@ if __name__ == "__main__":
     # =========================================================================
     folder_path = "datasets/test/"
     image_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
-    # image_paths = image_paths[:5]  # TODO: remove limit to 5 images for testing
-
 
     # The paper's configuration (see Page 4, Section 3.2)
     model_name = config['model']
@@ -101,6 +102,13 @@ if __name__ == "__main__":
     learning_rate = 0.001
     is_pretrained = config['pretrained']
     iterations = 9000 if not is_pretrained else 1200
+
+    print(f'Running experiment for {model_name} model.')
+
+    # Set file name for logging
+    log_filename = f'{model_name}-experiment.txt'
+    if is_pretrained:
+        log_filename = f'meta-{log_filename}'
     # ========================================================================
     # Run the experiment
     # ========================================================================
@@ -128,7 +136,6 @@ if __name__ == "__main__":
 
         # Load the settings from the config file
         model, optimizer = load_from_configs()
-        model.train()  # set model to training mode
         optim_start_time = time.time()  # optimization start time
         train(model, training_input, I_ClippedPP_5d_coords, ground_truth, optimizer, loss_fn, iterations, device)
         optim_end_time = time.time()
@@ -151,12 +158,16 @@ if __name__ == "__main__":
         psnr_og_loss.append(psnr_og)
         optim_times.append(total_optim_time)
 
-        print('img optimization time: ', total_optim_time)
+        # print('img optimization time: ', total_optim_time)
+
+        # Update the file every 20 images
+        if len(rmse_loss) % 20 == 0:
+            print(f'Processed {len(rmse_loss)} images.')
+            report_metrics(rmse_loss, rmse_og_loss, psnr_loss, psnr_og_loss, optim_times, log_filename)
          
-        del model, training_input, I_PP, I_ClippedPP, OG_mask, display_I_PP, display_I_ClippedPP, display_OG_mask, restored_I_PP
+        del model, training_input, I_PP, I_ClippedPP, OG_mask, display_I_PP, display_I_ClippedPP, display_OG_mask
+        del encoded_5d_coords, I_Clipped_PP_5d_coords, ground_truth, restored_I_PP
         torch.cuda.empty_cache()        # clear GPU memory
     
-    log_filename = f'{model_name}-experiment.txt'
-    if is_pretrained:
-        log_filename = f'meta-{log_filename}'
+    print("Saving final results in: ", log_filename)
     report_metrics(rmse_loss, rmse_og_loss, psnr_loss, psnr_og_loss, optim_times, log_filename)
