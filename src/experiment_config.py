@@ -12,7 +12,7 @@ Note that the optimizer, learning rate, and iterations are fixed depending on
 the model and if it is pretrained or not.
 '''
 config = {
-    'model': 'GamutMLP_137KB',
+    'model': 'GamutMLP',
     'pretrained': False,
     'pretrained_path': None,
     # 'restored_img_folder': 'mlp137',
